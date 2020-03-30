@@ -37,37 +37,12 @@ class LevelInfo{
 public:
 	std::vector<SSTable*> fileList;
 	LevelInfo(size_t l, std::vector<SSTable*> f):level(l),fileList(f){}
-	bool isFull(){
-		return (fileList.size()>2*(level+1));
-	}
-	bool empty() {
-		return !fileList.size();
-	}
-	void addFile(SSTable* file){
-		fileList.push_back(file);
-	}
-	void removeFile(std::string filename) {
-		auto iter = fileList.begin();
-		while(iter != fileList.end()) {
-			if ((*iter)->filename == filename) {
-				iter = fileList.erase(iter);
-				std::string path = "./dir/level" + std::to_string(level) + "/"+ filename + ".txt";
-				remove((char*)path.data());
-			}
-			else iter++;
-		}
-	}
-	std::vector<SSTable*> pickFiles() {
-		std::vector<SSTable*> pickedFiles;
-		std::sort(fileList.begin(), fileList.end(),
-			[](const SSTable* a, const SSTable* b) {
-			return std::stoi(a->filename) > std::stoi(b->filename);
-		});
-		for (size_t i = level+1; i < fileList.size(); i++) {
-			pickedFiles.push_back(fileList[i]);
-		}
-		return pickedFiles;
-	}
+	bool isFull(){return (fileList.size()>2*(level+1));}
+	bool empty() {return !fileList.size();}
+	void addFile(SSTable* file){fileList.push_back(file);}
+	void removeFile(std::string filename);
+	bool getFilePath(std::string filename, std::string& path);
+	std::vector<SSTable*> pickFiles();
 	V* get(uint64_t key);
 };
 
