@@ -1,4 +1,5 @@
-#pragma once
+#ifndef DISK_H
+#define DISK_H
 
 #include <string>
 #include <vector>
@@ -6,6 +7,7 @@
 #include <fstream>
 #include <experimental/filesystem>
 #include <algorithm> 
+#include <math.h> 
 
 #define K uint64_t 
 #define V std::string
@@ -13,6 +15,7 @@
 #define MAX_FILE_SIZE 2*1024*1024
 
 namespace fs = std::experimental::filesystem;
+using recursive_directory_iterator = std::experimental::filesystem::recursive_directory_iterator;
 
 struct Pair{
 	K key; K offset; 
@@ -34,16 +37,19 @@ struct SSTable {
 
 class LevelInfo{
 	size_t level;
+	size_t max_size;
 public:
 	std::vector<SSTable*> fileList;
-	LevelInfo(size_t l, std::vector<SSTable*> f):level(l),fileList(f){}
-	bool isFull(){return (fileList.size()>2*(level+1));}
+	LevelInfo(size_t l, std::vector<SSTable*> f) 
+		:level(l), fileList(f) {max_size = std::pow(2, (l + 1));}
+	bool isFull(){return (fileList.size()>max_size);}
 	bool empty() {return !fileList.size();}
 	void addFile(SSTable* file){fileList.push_back(file);}
 	void removeFile(std::string filename);
 	bool getFilePath(std::string filename, std::string& path);
 	std::vector<SSTable*> pickFiles();
 	V* get(uint64_t key);
+	bool isSorted();
 };
 
 class DiskInfo{
@@ -53,11 +59,12 @@ class DiskInfo{
 		std::string getTimeStamp() { timestamp += 1; return ToString(timestamp); }
 	}timeStamp;
 protected:	
-	bool ReachEnd(std::vector<size_t> indexList, std::vector<size_t> sizeList);
-	size_t getIterWithMinKey(std::vector<std::vector<Pair>::iterator> iterList, std::vector<size_t> indexList, std::vector<size_t> sizeList);
+	bool ReachEnd(std::vector<std::vector<Pair>::iterator> indexList, std::vector<std::vector<Pair>::iterator> indexEndList);
+	size_t getIterWithMinKey(std::vector<std::vector<Pair>::iterator> indexList, std::vector<std::vector<Pair>::iterator> indexEndList);
 	K findMinKey(std::vector<SSTable*> fileList);
 	K findMaxKey(std::vector<SSTable*> fileList);
-	bool SelectNextLevel(size_t level, std::vector<SSTable*>& filesToSort);
+	std::vector<SSTable*> SelectNextLevel(size_t level, std::vector<SSTable*>& filesToSort);
+	std::vector<SSTable*> filterFiles(std::vector<SSTable*> filesSelected, std::vector<SSTable*>& filesToMove);
 	bool newLevel(size_t level);
 	bool empty(size_t level) { return LevelList[level]->empty(); }
 	void mergeFiles(std::vector<SSTable*>filesToMerge, size_t curLevel);
@@ -69,4 +76,7 @@ public:
 	std::ofstream* createOutFile(size_t Level, std::string& filename);
 	void finishOutFile(size_t level, std::ofstream* outfile, SSTable* cacheFile);
 	V* get(uint64_t key);
+	void load();
+	void loadCache(fs::path dirEntry);
 };
+#endif
