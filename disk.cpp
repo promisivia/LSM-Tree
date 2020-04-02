@@ -1,23 +1,22 @@
 #include "disk.h"
-#include <assert.h>
 
-void LevelInfo::removeFile(std::string filename) {
+void LevelInfo::removeFile( string filename) {
 	auto iter = fileList.begin();
 	while (iter != fileList.end()) {
 		if ((*iter)->filename == filename) {
 			iter = fileList.erase(iter);
-			std::string path = "./dir/level" + std::to_string(level) + "/" + filename + ".txt";
+			 string path = "./dir/level" +  to_string(level) + "/" + filename + ".txt";
 			remove((char*)path.data());
 		}
 		else iter++;
 	}
 }
 
-bool LevelInfo::getFilePath(std::string filename, std::string& path) {
+bool LevelInfo::getFilePath(string filename, string& path) {
 	auto iter = fileList.begin();
 	while (iter != fileList.end()) {
 		if ((*iter)->filename == filename) {
-			path = "./dir/level" + std::to_string(level) + "/" + filename + ".txt";
+			path = "./dir/level" + to_string(level) + "/" + filename + ".txt";
 			return true;
 		}
 		iter++;
@@ -25,18 +24,18 @@ bool LevelInfo::getFilePath(std::string filename, std::string& path) {
 	return false;
 }
 
-std::vector<SSTable*> LevelInfo::pickFiles() {
-	std::vector<SSTable*> pickedFiles;
-	size_t num = fileList.size() - max_size + 1;
-	for (size_t i = 0; i < num; i++) {
-		pickedFiles.push_back(fileList[i]);
-	}
+vector<SSTable*> LevelInfo::pickFiles() {
+	vector<SSTable*> pickedFiles;
+	sort(fileList.begin(), fileList.end(), [](const SSTable* a, const SSTable* b) {
+		return stoi(a->filename) < stoi(b->filename);
+	});
+	pickedFiles.push_back(fileList[0]);
 	return pickedFiles;
 }
 
 bool LevelInfo::isSorted() {
 	for (size_t i = 0; i < fileList.size();i++) {
-		for (size_t j = i; j < fileList.size(); j++) {
+		for (size_t j = i+1; j < fileList.size(); j++) {
 			if (fileList[i]->maxKey >= fileList[j]->minKey && fileList[i]->minKey <= fileList[j]->maxKey)
 				return false;
 		}
@@ -46,18 +45,19 @@ bool LevelInfo::isSorted() {
 
 bool DiskInfo::newLevel(size_t level) {
 	bool create = false;
-	if (!fs::exists("./dir/level" + ToString(level))) {
-		fs::create_directory("./dir/level" + ToString(level));
-	}
+
 	if (LevelList.size() <= level) {
-		std::vector<SSTable*> fileList;
+		vector<SSTable*> fileList;
 		LevelList.push_back(new LevelInfo(level, fileList));
 		create = true;
+	}	
+	if (!fs::exists("./dir/level" + to_string(level))) {
+		fs::create_directory("./dir/level" + to_string(level));
 	}
 	return create;
 }
 
-K DiskInfo::findMaxKey(std::vector<SSTable*> fileList) {
+K DiskInfo::findMaxKey(vector<SSTable*> fileList) {
 	K res = fileList[0]->maxKey;
 	for (auto &c : fileList) {
 		if (c->maxKey > res)
@@ -66,7 +66,7 @@ K DiskInfo::findMaxKey(std::vector<SSTable*> fileList) {
 	return res;
 }
 
-K DiskInfo::findMinKey(std::vector<SSTable*> fileList) {
+K DiskInfo::findMinKey(vector<SSTable*> fileList) {
 	K res = fileList[0]->minKey;
 	for (auto c : fileList) {
 		if (c->minKey < res)
@@ -75,11 +75,11 @@ K DiskInfo::findMinKey(std::vector<SSTable*> fileList) {
 	return res;
 }
 
-std::vector<SSTable*> DiskInfo::SelectNextLevel(size_t level, std::vector<SSTable*>& filesToSort) {
+vector<SSTable*> DiskInfo::SelectNextLevel(size_t level, vector<SSTable*> filesToMove) {
 	
-	std::vector<SSTable*> filesSelected;
-	K minKey = findMinKey(filesToSort);
-	K maxKey = findMaxKey(filesToSort);
+	vector<SSTable*> filesSelected;
+	K minKey = findMinKey(filesToMove);
+	K maxKey = findMaxKey(filesToMove);
 	for (auto &c:LevelList[level]->fileList){
 		if (!(c->minKey > maxKey || c->maxKey < minKey)){
 			filesSelected.push_back(c);
@@ -88,8 +88,8 @@ std::vector<SSTable*> DiskInfo::SelectNextLevel(size_t level, std::vector<SSTabl
 	return filesSelected;
 }
 
-std::vector<SSTable*> DiskInfo::filterFiles(std::vector<SSTable*> filesSelected, std::vector<SSTable*>& filesToMove) {
-	std::vector<SSTable*> filesFiltered;
+vector<SSTable*> DiskInfo::filterFiles(vector<SSTable*> filesSelected, vector<SSTable*>& filesToMove) {
+	vector<SSTable*> filesFiltered;
 	K minKey = findMinKey(filesSelected);
 	K maxKey = findMaxKey(filesSelected);
 	auto iter = filesToMove.begin();
@@ -102,144 +102,111 @@ std::vector<SSTable*> DiskInfo::filterFiles(std::vector<SSTable*> filesSelected,
 	return filesFiltered;
 }
 
-void DiskInfo::moveAllFiles(std::vector<SSTable*> filelist, size_t curl, size_t tarl) {
-	std::string name, oldP, newP;
+void DiskInfo::moveFiles(vector<SSTable*> filelist, size_t curl, size_t tarl) {
+	string name, oldP, newP;
 	for (size_t i = 0; i < filelist.size(); i++)
 	{
 		name = filelist[i]->filename;
 		// disk
-		oldP = "./dir/level" + ToString(curl) + "/" + name + ".txt";
-		newP = "./dir/level" + ToString(tarl) + "/" + name + ".txt";
+		oldP = "./dir/level" + to_string(curl) + "/" + name + ".txt";
+		newP = "./dir/level" + to_string(tarl) + "/" + name + ".txt";
 		fs::rename(oldP, newP);
 		// memory
 		LevelList[tarl]->addFile(filelist[i]);
-
-		auto iter = LevelList[curl]->fileList.begin();
-		while (iter != LevelList[curl]->fileList.end()) {
+		for (auto iter = LevelList[curl]->fileList.begin(); iter != LevelList[curl]->fileList.end(); iter++) {
 			if ((*iter)->filename == name) {
-				iter = LevelList[curl]->fileList.erase(iter);				
+				LevelList[curl]->fileList.erase(iter);	
+				break;
 			}
-			else iter++;
 		}		
 	}
 }
 
 void DiskInfo::Compaction(size_t levelNow) {
-	if (!LevelList[levelNow]->isFull()) {
-		return;
-	}
-	//select files
-	std::vector<SSTable*> filesToMove;
-	std::vector<SSTable*> filesToMerge;
+	if (!LevelList[levelNow]->isFull()) return;
 	newLevel(levelNow + 1);
 
+	//select files
+	vector<SSTable*> filesToMove;
+	vector<SSTable*> filesToMerge;
+
 	if (levelNow == 0) {
-		filesToMove = LevelList[0]->fileList;//第一层的所有文件	
-		/*
-		if (LevelList[0]->isSorted()) {
-			moveAllFiles(filesToMove, 0, 1);
-			Compaction(1);
-			return;
-		}
-		*/		
-		if (!empty(1)) {
-			//如果下一层存在文件，去下一层选取文件
-			std::vector<SSTable*> filesSelected = SelectNextLevel(1, filesToMove);
-			if (filesSelected.empty()) {
-				//如果没有选到
-				moveAllFiles(filesToMove, 0, 1);
+		filesToMove = LevelList[0]->fileList;
+		if (!empty(1)) 
+			filesToMerge = SelectNextLevel(1, filesToMove);
+		if (LevelList[0]->isSorted()) { //下层为空，本层有序 or 下层不为空但没有选到
+			if ( empty(1) || (!empty(1) && filesToMerge.empty())) {
+				moveFiles(filesToMove, 0, 1);
 				Compaction(1);
 				return;
 			}
 		}
-
-		//ordered with their create time
-		std::sort(filesToMove.begin(), filesToMove.end(),
-			[](const SSTable* a, const SSTable* b) {
-			return std::stoi(a->filename) > std::stoi(b->filename);
+		//其他情况都需要merge
+		filesToMerge.insert(filesToMerge.end(), filesToMove.begin(), filesToMove.end());
+		sort(filesToMerge.begin(), filesToMerge.end(),[](const SSTable* a, const SSTable* b) {
+			return stoi(a->filename) > stoi(b->filename);
 		});
-
-		//merge files
-		mergeFiles(filesToMove, 0);
+		mergeFiles(filesToMerge, 0);
 		Compaction(1);
 		return;
 	}		
 	else {
 		filesToMove = LevelList[levelNow]->pickFiles();
-		newLevel(levelNow + 1);
-		if (!empty(levelNow + 1)) {
-			//如果下一层存在文件，去下一层选取文件
-			std::vector<SSTable*> filesSelected = SelectNextLevel(levelNow + 1, filesToMove);
-			if (filesSelected.empty()) {
-				//如果没有选到
-				moveAllFiles(filesToMove, levelNow, levelNow + 1);
-				Compaction(levelNow + 1);
-				return;
-			}
-			else {
-				//如果选到了
-				filesToMerge = filterFiles(filesSelected, filesToMove);
-				moveAllFiles(filesToMove, levelNow, levelNow + 1);
-				mergeFiles(filesToMerge, levelNow);
-				//ordered with their create time
-				std::sort(filesToMerge.begin(), filesToMerge.end(),
-					[](const SSTable* a, const SSTable* b) {
-					return std::stoi(a->filename) > std::stoi(b->filename);
+		if (empty(levelNow + 1)) 
+			moveFiles(filesToMove, levelNow, levelNow + 1);
+		else { //如果下一层存在文件，去下一层选取文件
+			filesToMerge = SelectNextLevel(levelNow + 1, filesToMove);
+			if (filesToMerge.empty()) {//如果没有选到
+				moveFiles(filesToMove, levelNow, levelNow + 1);
+			}else {//如果选到了
+				filesToMerge.insert(filesToMerge.end(), filesToMove.begin(), filesToMove.end());
+				sort(filesToMerge.begin(), filesToMerge.end(),[](const SSTable* a, const SSTable* b) {
+					return stoi(a->filename) > stoi(b->filename);
 				});
-				Compaction(levelNow + 1);
-				return;
+				mergeFiles(filesToMerge, levelNow);				
 			}
-		}
-		else {
-			//如果下一层为空
-			moveAllFiles(filesToMove, levelNow, levelNow + 1);
-			Compaction(levelNow + 1);
+			if (LevelList[levelNow]->isFull())Compaction(levelNow);
+			else Compaction(levelNow + 1);
 			return;
 		}
 	}
 }
 
-void DiskInfo::mergeFiles(std::vector<SSTable*> filesToMerge, size_t curLevel)
+void DiskInfo::mergeFiles(vector<SSTable*> filesToMerge, size_t curLevel)
 {
 	size_t fileCount = filesToMerge.size();
+	vector<vector<Pair>::iterator> iterList;
+	vector<vector<Pair>::iterator> iterEndList;
+	vector<ifstream*> inFileList;
+	vector<ofstream*> outFileList;
+	vector<SSTable*> cacheFileList;
 
 	// init list of iter and list of files to read
-	std::vector<std::vector<Pair>::iterator> iterList;
-	std::vector<std::vector<Pair>::iterator> iterEndList;
-	std::vector <std::ifstream*> inFileList;
-	
 	for (size_t i = 0; i < fileCount; i++)
 	{
 		iterList.push_back(filesToMerge[i]->cache.begin());
 		iterEndList.push_back(filesToMerge[i]->cache.end());
 
-		std::string path;
-		std::ifstream* infile;
-		if(LevelList[curLevel]->getFilePath(filesToMerge[i]->filename,path)){
-			infile = new std::ifstream(path, std::ios::binary);
-		}
-		else {
-			infile = new std::ifstream("./dir/level" + ToString(curLevel+1) + "/" + filesToMerge[i]->filename + ".txt", std::ios::binary);
-		}
+		string path;
+		ifstream* infile;
+		if(LevelList[curLevel]->getFilePath(filesToMerge[i]->filename,path))
+			infile = new ifstream(path, ios::binary);
+		else 
+			infile = new ifstream("./dir/level" + to_string(curLevel+1) + "/" + filesToMerge[i]->filename + ".txt", ios::binary);
 		inFileList.push_back(infile);
 	}
 	
 	// init files to write
-	std::string filename;
-	std::ofstream* outfile = createOutFile(curLevel + 1, filename);//在下一层创建文件
-	std::vector <std::ofstream*> outFileList;
+	string filename;size_t indexOut = 0;
+	ofstream* outfile = createOutFile(curLevel + 1, filename);
 	outFileList.push_back(outfile);
 
 	// init the detail of SSTable
 	size_t curFileSize = 0;
-	std::string value;
-	char test;
+	V value; K lastKey = -1;
 	auto offset = outfile->tellp(); //offset
 	SSTable* cacheFile = new SSTable(filename, 0, 0, 0); 
-	std::vector<SSTable*> cacheFileList;
-	cacheFileList.push_back(cacheFile);
-
-	size_t indexOut = 0;
+	cacheFileList.push_back(cacheFile);	
 
 	// merge infiles to outfiles	
 	while (!ReachEnd(iterList, iterEndList)) {
@@ -248,22 +215,14 @@ void DiskInfo::mergeFiles(std::vector<SSTable*> filesToMerge, size_t curLevel)
 
 		// read
 		inFileList[index]->seekg(iterList[index]->offset); 
-		*(inFileList[index]) >> std::noskipws >> test;
-		if (test == ' ') {
-			value = "";
-		}
-		else {
-			inFileList[index]->seekg(iterList[index]->offset);
-			*(inFileList[index]) >> value;
-		}
+		if (inFileList[index]->peek() == TOMBSTONE)value = "";
+		else *(inFileList[index]) >> value;
 		
 		// write
-		if (!cacheFileList[indexOut]->cache.empty()) {
-			if (iterList[index]->key == cacheFileList[indexOut]->cache.back().key) {
-				iterList[index]++;
-				continue;
-			}
+		if (iterList[index]->key == lastKey) {
+			iterList[index]++;continue;
 		}
+		lastKey = iterList[index]->key;
 
 		*outFileList[indexOut] << iterList[index]->key << " ";
 		offset = outFileList[indexOut]->tellp();
@@ -278,19 +237,13 @@ void DiskInfo::mergeFiles(std::vector<SSTable*> filesToMerge, size_t curLevel)
 		// create another file if too big or reach end
 		if (curFileSize > MAX_FILE_SIZE){
 			if (ReachEnd(iterList, iterEndList)) break;
-
 			// record file
-			finishOutFile(curLevel + 1, outFileList[indexOut], cacheFileList[indexOut]);
-		
-			// update size, offset			
-
-			std::string filename;
-			std::ofstream* outfile = createOutFile(curLevel + 1, filename); 
-			outFileList.push_back(outfile);
-
+			finishOutFile(curLevel + 1, outFileList[indexOut], cacheFileList[indexOut]);					
+			// update	
+			ofstream* outfile = createOutFile(curLevel + 1, filename); 
+			outFileList.push_back(outfile);			
 			SSTable* cacheFile = new SSTable(filename, 0, 0, 0);
 			cacheFileList.push_back(cacheFile);
-
 			indexOut++;
 			curFileSize = 0;
 			offset = 0;	
@@ -311,7 +264,7 @@ void DiskInfo::mergeFiles(std::vector<SSTable*> filesToMerge, size_t curLevel)
 	}
 }
 
-bool DiskInfo::ReachEnd(std::vector<std::vector<Pair>::iterator> indexList, std::vector<std::vector<Pair>::iterator> indexEndList) {
+bool DiskInfo::ReachEnd(vector<vector<Pair>::iterator> indexList, vector<vector<Pair>::iterator> indexEndList) {
 	for (size_t i = 0; i < indexList.size(); ++i) {
 		if (indexList[i] != indexEndList[i])
 			return false;
@@ -319,8 +272,8 @@ bool DiskInfo::ReachEnd(std::vector<std::vector<Pair>::iterator> indexList, std:
 	return true;
 }
 
-size_t DiskInfo::getIterWithMinKey(std::vector<std::vector<Pair>::iterator> iterList, std::vector<std::vector<Pair>::iterator> indexEndList) {
-	std::vector<size_t> able;
+size_t DiskInfo::getIterWithMinKey(vector<vector<Pair>::iterator> iterList, vector<vector<Pair>::iterator> indexEndList) {
+	vector<size_t> able;
 	for (size_t i = 0; i < iterList.size(); ++i) {
 		if (iterList[i] != indexEndList[i]) {
 			able.push_back(i);
@@ -337,21 +290,21 @@ size_t DiskInfo::getIterWithMinKey(std::vector<std::vector<Pair>::iterator> iter
 	return index;
 }
 
-std::ofstream* DiskInfo::createOutFile(size_t Level, std::string& filename){
+ofstream* DiskInfo::createOutFile(size_t Level, string& filename){
 	filename = timeStamp.getTimeStamp();
-	std::string path = "./dir/level" + ToString(Level);
+	string path = "./dir/level" + to_string(Level);
 	if (!fs::exists(path)) {
 		fs::create_directories(path);
 	}
-	std::ofstream* outfile = new std::ofstream(path + "/" + filename + ".txt", std::ios::binary);
+	ofstream* outfile = new ofstream(path + "/" + filename + ".txt", ios::binary);
 	if (!outfile) {
-		std::cerr << "Failed to open the file!";
+		cerr << "Failed to open the file!";
 		exit(0);
 	}
 	return outfile;
 }
 
-void DiskInfo::finishOutFile(size_t level, std::ofstream* outfile, SSTable* cacheFile) {
+void DiskInfo::finishOutFile(size_t level, ofstream* outfile, SSTable* cacheFile) {
 	//update cache file
 	cacheFile->minKey = cacheFile->cache.front().key;
 	cacheFile->maxKey = cacheFile->cache.back().key;
@@ -390,23 +343,18 @@ V* LevelInfo::get(uint64_t key) {
 
 V* SSTable::search(K key, size_t level) {
 	if (key > maxKey || key < minKey)return nullptr;
-	auto iter = std::find_if(cache.begin(), cache.end(), [key](Pair const& n) {
+	auto iter = find_if(cache.begin(), cache.end(), [key](Pair const& n) {
 		return n.key == key;
 	});
 	if (iter == cache.end())return nullptr;
 	
 	auto offset = iter->offset;
-	std::ifstream infile("./dir/level" + ToString(level) + "/" + filename + ".txt", std::ios::binary);
+	ifstream infile("./dir/level" + to_string(level) + "/" + filename + ".txt", ios::binary);
 	infile.seekg(offset);
 	
-	V v;char test;
-	infile >> std::noskipws >> test;
-	if (test == ' ') {
-		v = "";
-	}else {
-		infile.seekg(offset);
-		infile >> v;
-	}
+	V v;
+	if (infile.peek() == TOMBSTONE)  v = "";
+	else infile >> v;
 	
 	V* value = new V(v);
 	return value;
@@ -415,10 +363,12 @@ V* SSTable::search(K key, size_t level) {
 void DiskInfo::load() {
 	size_t level = 0;
 	while (1) {
-		fs::path dir_path = "./dir/level" + ToString(level);
+		fs::path dir_path = "./dir/level" + to_string(level);
 		if (!exists(dir_path)) return;
-		for (const auto& filename : recursive_directory_iterator(dir_path)) {
-			loadCache(filename.path());
+		for (const auto& file : recursive_directory_iterator(dir_path)) {
+			auto filename = file.path().filename().string();
+			SSTable* sst = new SSTable(filename,0,0,0);
+			loadCache(file.path());
 		}
 		level++;
 	}
@@ -426,6 +376,12 @@ void DiskInfo::load() {
 
 void DiskInfo::loadCache(fs::path filepath)
 {
-	std::ifstream infile(filepath, std::ios::binary);
-
+	ifstream infile(filepath,  ios::binary);
+	infile.seekg(0,  ios::end);
+	while (infile.peek() != infile.widen(TOMBSTONE))
+	{
+		infile.seekg(-1, infile.cur);
+	}
+	size_t divide;
+	infile >> divide;
 }

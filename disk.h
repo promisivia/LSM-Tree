@@ -7,15 +7,16 @@
 #include <fstream>
 #include <experimental/filesystem>
 #include <algorithm> 
-#include <math.h> 
+#include <cmath> 
 
 #define K uint64_t 
-#define V std::string
-#define ToString std::to_string
+#define V string
 #define MAX_FILE_SIZE 2*1024*1024
+#define TOMBSTONE ' '
 
-namespace fs = std::experimental::filesystem;
-using recursive_directory_iterator = std::experimental::filesystem::recursive_directory_iterator;
+using namespace std;
+namespace fs = experimental::filesystem;
+using recursive_directory_iterator = experimental::filesystem::recursive_directory_iterator;
 
 struct Pair{
 	K key; K offset; 
@@ -25,56 +26,55 @@ struct Pair{
 };
 
 struct SSTable {
-	std::string filename = "";
+	string filename;
 	K minKey = 0;
 	K maxKey = 0;
-	std::streampos divide;	
-	std::vector<Pair> cache;
-	SSTable(std::string fn, K minK, K maxK, std::streampos div)
+	streampos divide;	
+	vector<Pair> cache;
+	SSTable(string fn, K minK, K maxK, streampos div)
 		:filename(fn), minKey(minK), maxKey(maxK), divide(div){}
 	V* search(K key, size_t level);
 };
 
 class LevelInfo{
 	size_t level;
-	size_t max_size;
+	size_t capacity;
 public:
-	std::vector<SSTable*> fileList;
-	LevelInfo(size_t l, std::vector<SSTable*> f) 
-		:level(l), fileList(f) {max_size = std::pow(2, (l + 1));}
-	bool isFull(){return (fileList.size()>max_size);}
+	vector<SSTable*> fileList;
+	LevelInfo(size_t l, vector<SSTable*> f) :level(l), fileList(f) { capacity = l > 5 ? 128 : (size_t)pow(2, (l + 1)); }
+	bool isFull(){return (fileList.size()>capacity);}
 	bool empty() {return !fileList.size();}
 	void addFile(SSTable* file){fileList.push_back(file);}
-	void removeFile(std::string filename);
-	bool getFilePath(std::string filename, std::string& path);
-	std::vector<SSTable*> pickFiles();
-	V* get(uint64_t key);
+	void removeFile(string filename);
+	bool getFilePath(string filename, std::string& path);
 	bool isSorted();
+	std::vector<SSTable*> pickFiles();
+	V* get(uint64_t key);	
 };
 
 class DiskInfo{
 	std::vector<LevelInfo*> LevelList;
 	struct TimeStamp {
 		uint64_t  timestamp = 0;
-		std::string getTimeStamp() { timestamp += 1; return ToString(timestamp); }
+		std::string getTimeStamp() { timestamp += 1; return to_string(timestamp); }
 	}timeStamp;
 protected:	
-	bool ReachEnd(std::vector<std::vector<Pair>::iterator> indexList, std::vector<std::vector<Pair>::iterator> indexEndList);
-	size_t getIterWithMinKey(std::vector<std::vector<Pair>::iterator> indexList, std::vector<std::vector<Pair>::iterator> indexEndList);
-	K findMinKey(std::vector<SSTable*> fileList);
-	K findMaxKey(std::vector<SSTable*> fileList);
-	std::vector<SSTable*> SelectNextLevel(size_t level, std::vector<SSTable*>& filesToSort);
-	std::vector<SSTable*> filterFiles(std::vector<SSTable*> filesSelected, std::vector<SSTable*>& filesToMove);
+	bool ReachEnd(vector<vector<Pair>::iterator> indexList, vector<vector<Pair>::iterator> indexEndList);
+	size_t getIterWithMinKey(vector<vector<Pair>::iterator> indexList, vector<vector<Pair>::iterator> indexEndList);
+	K findMinKey(vector<SSTable*> fileList);
+	K findMaxKey(vector<SSTable*> fileList);
+	vector<SSTable*> SelectNextLevel(size_t level, vector<SSTable*> filesToMove);
+	vector<SSTable*> filterFiles(vector<SSTable*> filesSelected, vector<SSTable*>& filesToMove);
 	bool newLevel(size_t level);
 	bool empty(size_t level) { return LevelList[level]->empty(); }
 	void mergeFiles(std::vector<SSTable*>filesToMerge, size_t curLevel);
-	void moveAllFiles(std::vector<SSTable*> filelists, size_t curl, size_t tarl);
+	void moveFiles(std::vector<SSTable*> filelists, size_t curl, size_t tarl);
 public:
 	DiskInfo(){fs::remove_all("./dir");}
 	~DiskInfo(){fs::remove_all("./dir");}
 	void Compaction(size_t levelNow);
-	std::ofstream* createOutFile(size_t Level, std::string& filename);
-	void finishOutFile(size_t level, std::ofstream* outfile, SSTable* cacheFile);
+	ofstream* createOutFile(size_t Level, string& filename);
+	void finishOutFile(size_t level, ofstream* outfile, SSTable* cacheFile);
 	V* get(uint64_t key);
 	void load();
 	void loadCache(fs::path dirEntry);
