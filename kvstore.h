@@ -4,12 +4,18 @@
 #include <filesystem>
 
 class KVStore : public KVStoreAPI {
-	// You can add your implementation here
 private:
 	Skiplist* MemTable;
 	DiskInfo* Disk;
 protected:
+	/**
+	 * When the MemTable is full.
+	 * Create a SSTable and put it to disk.
+	 */
 	void createSSTable();
+	/**
+	 * Reset the MemTable.
+	 */
 	void resetMemTable();
 public:
 	KVStore(const std::string &dir);

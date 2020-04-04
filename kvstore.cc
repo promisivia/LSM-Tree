@@ -1,5 +1,4 @@
 #include "kvstore.h"
-#include <string>
 #include <iostream>
 #include <fstream>
 
@@ -11,7 +10,8 @@ KVStore::KVStore(const std::string &dir): KVStoreAPI(dir)
 
 KVStore::~KVStore()
 {
-	reset();
+	delete Disk;
+	delete MemTable;
 }
 
 /**
@@ -20,6 +20,7 @@ KVStore::~KVStore()
  */
 void KVStore::put(uint64_t key, const std::string &s)
 {
+	if (!MemTable)MemTable = new Skiplist();
 	if (MemTable->put(key, s)) {
 		return;
 	}
@@ -72,12 +73,13 @@ bool KVStore::del(uint64_t key)
 void KVStore::reset()
 {
 	delete MemTable;
+	KVStore::MemTable = new Skiplist();
 	delete Disk;
+	Disk = new DiskInfo();
 }
 
 void KVStore::resetMemTable(){
 	delete MemTable;
-	MemTable = nullptr;
 	KVStore::MemTable = new Skiplist();
 }
 

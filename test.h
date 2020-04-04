@@ -23,7 +23,7 @@ protected:
 		++nr_tests;
 		//std::cerr << "exp: " << exp << ", got:" <<got << std::endl;;//need to delete
 		if (exp == got) {
-			++nr_passed_tests;		
+			++nr_passed_tests;			
 			return;
 		}
 		if (verbose) {

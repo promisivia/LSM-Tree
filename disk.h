@@ -1,11 +1,10 @@
-#ifndef DISK_H
-#define DISK_H
+#pragma once
 
 #include <string>
 #include <vector>
 #include <iostream>
 #include <fstream>
-#include <experimental/filesystem>
+#include <filesystem>
 #include <algorithm> 
 #include <cmath> 
 
@@ -15,8 +14,8 @@
 #define TOMBSTONE ' '
 
 using namespace std;
-namespace fs = experimental::filesystem;
-using recursive_directory_iterator = experimental::filesystem::recursive_directory_iterator;
+namespace fs = filesystem;
+using recursive_directory_iterator = filesystem::recursive_directory_iterator;
 
 struct Pair{
 	K key; K offset; 
@@ -37,9 +36,9 @@ struct SSTable {
 };
 
 class LevelInfo{
+public:
 	size_t level;
 	size_t capacity;
-public:
 	vector<SSTable*> fileList;
 	LevelInfo(size_t l, vector<SSTable*> f) :level(l), fileList(f) { capacity = l > 5 ? 128 : (size_t)pow(2, (l + 1)); }
 	bool isFull(){return (fileList.size()>capacity);}
@@ -69,14 +68,14 @@ protected:
 	bool empty(size_t level) { return LevelList[level]->empty(); }
 	void mergeFiles(std::vector<SSTable*>filesToMerge, size_t curLevel);
 	void moveFiles(std::vector<SSTable*> filelists, size_t curl, size_t tarl);
+	void AddLevel(size_t level, vector<SSTable*> filesToMove);
 public:
-	DiskInfo(){fs::remove_all("./dir");}
+	DiskInfo(){}
 	~DiskInfo(){fs::remove_all("./dir");}
 	void Compaction(size_t levelNow);
 	ofstream* createOutFile(size_t Level, string& filename);
 	void finishOutFile(size_t level, ofstream* outfile, SSTable* cacheFile);
 	V* get(uint64_t key);
 	void load();
-	void loadCache(fs::path dirEntry);
+	SSTable* loadFile(fs::path filePath, size_t level);
 };
-#endif

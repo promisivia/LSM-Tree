@@ -5,7 +5,7 @@ void LevelInfo::removeFile( string filename) {
 	while (iter != fileList.end()) {
 		if ((*iter)->filename == filename) {
 			iter = fileList.erase(iter);
-			 string path = "./dir/level" +  to_string(level) + "/" + filename + ".txt";
+			string path = "./dir/level" +  to_string(level) + "/" + filename + ".txt";
 			remove((char*)path.data());
 		}
 		else iter++;
@@ -27,9 +27,11 @@ bool LevelInfo::getFilePath(string filename, string& path) {
 vector<SSTable*> LevelInfo::pickFiles() {
 	vector<SSTable*> pickedFiles;
 	sort(fileList.begin(), fileList.end(), [](const SSTable* a, const SSTable* b) {
-		return stoi(a->filename) > stoi(b->filename);
+		return stoi(a->filename) < stoi(b->filename);
 	});
-	pickedFiles.push_back(fileList[0]);
+	for (size_t i = capacity; i < fileList.size(); i++) {
+		pickedFiles.push_back(fileList[i]);
+	}	
 	return pickedFiles;
 }
 
@@ -176,7 +178,7 @@ void DiskInfo::Compaction(size_t levelNow) {
 			if (filesToMerge.empty()) {//如果没有选到
 				moveFiles(filesToMove, levelNow, levelNow + 1);
 			}else {//如果选到了
-				if (filesToMerge.size() > 5) {
+				if (filesToMerge.size() + filesToMerge.size() > 5) {
 					AddLevel(levelNow, filesToMove);
 				}
 				else {
@@ -244,9 +246,6 @@ void DiskInfo::mergeFiles(vector<SSTable*> filesToMerge, size_t curLevel)
 			iterList[index]++;continue;
 		}
 		lastKey = iterList[index]->key;
-		if (lastKey == 32318) {
-			cout << "DEBUG!!" << endl;
-		}
 		*outFileList[indexOut] << iterList[index]->key << " ";
 		offset = outFileList[indexOut]->tellp();
 		*outFileList[indexOut] << value << " ";
@@ -421,7 +420,7 @@ SSTable* DiskInfo::loadFile(fs::path filePath, size_t level)
 	infile.seekg(divide);
 	K key; K offset;
 	while (infile.tellg()!= end) {
-		infile >> key; infile.seekg(1, infile.cur);
+		infile >> key;
 		infile >> offset;
 		sst->cache.push_back(Pair(key, offset));
 	}
