@@ -59,8 +59,8 @@ bool DiskInfo::newLevel(size_t level) {
 	return create;
 }
 
-K DiskInfo::findMaxKey(vector<SSTable*> fileList) {
-	K res = fileList[0]->maxKey;
+dK DiskInfo::findMaxKey(vector<SSTable*> fileList) {
+	dK res = fileList[0]->maxKey;
 	for (auto &c : fileList) {
 		if (c->maxKey > res)
 			res = c->maxKey;
@@ -68,8 +68,8 @@ K DiskInfo::findMaxKey(vector<SSTable*> fileList) {
 	return res;
 }
 
-K DiskInfo::findMinKey(vector<SSTable*> fileList) {
-	K res = fileList[0]->minKey;
+dK DiskInfo::findMinKey(vector<SSTable*> fileList) {
+	dK res = fileList[0]->minKey;
 	for (auto c : fileList) {
 		if (c->minKey < res)
 			res = c->minKey;
@@ -80,8 +80,8 @@ K DiskInfo::findMinKey(vector<SSTable*> fileList) {
 vector<SSTable*> DiskInfo::SelectNextLevel(size_t level, vector<SSTable*> filesToMove) {
 	
 	vector<SSTable*> filesSelected;
-	K minKey = findMinKey(filesToMove);
-	K maxKey = findMaxKey(filesToMove);
+	dK minKey = findMinKey(filesToMove);
+	dK maxKey = findMaxKey(filesToMove);
 	for (auto &c:LevelList[level]->fileList){
 		if (!(c->minKey > maxKey || c->maxKey < minKey)){
 			filesSelected.push_back(c);
@@ -92,8 +92,8 @@ vector<SSTable*> DiskInfo::SelectNextLevel(size_t level, vector<SSTable*> filesT
 
 vector<SSTable*> DiskInfo::filterFiles(vector<SSTable*> filesSelected, vector<SSTable*>& filesToMove) {
 	vector<SSTable*> filesFiltered;
-	K minKey = findMinKey(filesSelected);
-	K maxKey = findMaxKey(filesSelected);
+	dK minKey = findMinKey(filesSelected);
+	dK maxKey = findMaxKey(filesSelected);
 	auto iter = filesToMove.begin();
 	while (iter != filesToMove.end()) {
 		if (!((*iter)->minKey > maxKey || (*iter)->maxKey < minKey)) {
@@ -227,7 +227,7 @@ void DiskInfo::mergeFiles(vector<SSTable*> filesToMerge, size_t curLevel)
 
 	// init the detail of SSTable
 	size_t curFileSize = 0;
-	V value; K lastKey = -1;
+	dV value; dK lastKey = -1;
 	auto offset = outfile->tellp(); //offset
 	SSTable* cacheFile = new SSTable(filename, 0, 0, 0); 
 	cacheFileList.push_back(cacheFile);	
@@ -239,7 +239,21 @@ void DiskInfo::mergeFiles(vector<SSTable*> filesToMerge, size_t curLevel)
 		// read
 		inFileList[index]->seekg(iterList[index]->offset); 
 		if (inFileList[index]->peek() == TOMBSTONE)value = "";
-		else *(inFileList[index]) >> value;
+		else {
+			int length;
+			if (iterList[index] + 1 != iterEndList[index]) {
+				auto temp = iterList[index] + 1;
+				length = temp->offset - iterList[index]->offset - 2 - to_string(temp->key).length();
+			}
+			else {
+				length = int(filesToMerge[index]->divide) - iterList[index]->offset - 1;
+			}
+			char* c = new char[length+1];
+			inFileList[index]->read(c, length);
+			c[length] = '\0';
+			value = c;
+			delete c;
+		}
 		
 		// write
 		if (iterList[index]->key == lastKey) {
@@ -344,8 +358,8 @@ void DiskInfo::finishOutFile(size_t level, ofstream* outfile, SSTable* cacheFile
 	outfile->close();
 }
 
-V* DiskInfo::get(uint64_t key) {
-	V* value;
+dV* DiskInfo::get(uint64_t key) {
+	dV* value;
 	if (LevelList.empty())
 		load();
 	for (size_t i = 0; i < LevelList.size(); i++){
@@ -355,8 +369,8 @@ V* DiskInfo::get(uint64_t key) {
 	return nullptr;
 }
 
-V* LevelInfo::get(uint64_t key) {
-	V* value;
+dV* LevelInfo::get(uint64_t key) {
+	dV* value;
 	for (size_t i = 0; i < fileList.size(); i++)
 	{
 		value = fileList[i]->search(key, level);
@@ -365,7 +379,7 @@ V* LevelInfo::get(uint64_t key) {
 	return nullptr;
 }
 
-V* SSTable::search(K key, size_t level) {
+dV* SSTable::search(dK key, size_t level) {
 	if (key > maxKey || key < minKey)return nullptr;
 	auto iter = find_if(cache.begin(), cache.end(), [key](Pair const& n) {
 		return n.key == key;
@@ -375,12 +389,25 @@ V* SSTable::search(K key, size_t level) {
 	auto offset = iter->offset;
 	ifstream infile("./dir/level" + to_string(level) + "/" + filename + ".txt", ios::binary);
 	infile.seekg(offset);
-	
-	V v;
+	dV v;
 	if (infile.peek() == TOMBSTONE)  v = "";
-	else infile >> v;
+	else {
+		int length;
+		if (iter + 1 != cache.end()) {
+			auto temp = iter + 1;
+			length = temp->offset - iter->offset - 2 - to_string(temp->key).length();
+		}
+		else {
+			length = int(divide) - iter->offset - 1;
+		}
+		char* c = new char[length+1];
+		infile.read(c, length);
+		c[length] = '\0';
+		v = c;
+		delete c;
+	}
 	
-	V* value = new V(v);
+	dV* value = new dV(v);
 	return value;
 }
 
@@ -418,7 +445,7 @@ SSTable* DiskInfo::loadFile(fs::path filePath, size_t level)
 	SSTable* sst = new SSTable(filename, 0, 0, divide);
 	// read the cache
 	infile.seekg(divide);
-	K key; K offset;
+	dK key; dK offset;
 	while (infile.tellg()!= end) {
 		infile >> key;
 		infile >> offset;

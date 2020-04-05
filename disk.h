@@ -8,8 +8,8 @@
 #include <algorithm> 
 #include <cmath> 
 
-#define K uint64_t 
-#define V string
+#define dK uint64_t 
+#define dV string
 #define MAX_FILE_SIZE 2*1024*1024
 #define TOMBSTONE ' '
 
@@ -18,21 +18,21 @@ namespace fs = filesystem;
 using recursive_directory_iterator = filesystem::recursive_directory_iterator;
 
 struct Pair{
-	K key; K offset; 
-	Pair(K k, K of) :key(k), offset(of) {}
+	dK key; dK offset; 
+	Pair(dK k, dK of) :key(k), offset(of) {}
 	bool operator==(Pair const&e) { return key == e.key; }
 	bool operator!=(Pair const&e) { return key != e.key; }
 };
 
 struct SSTable {
 	string filename;
-	K minKey = 0;
-	K maxKey = 0;
+	dK minKey = 0;
+	dK maxKey = 0;
 	streampos divide;	
 	vector<Pair> cache;
-	SSTable(string fn, K minK, K maxK, streampos div)
+	SSTable(string fn, dK minK, dK maxK, streampos div)
 		:filename(fn), minKey(minK), maxKey(maxK), divide(div){}
-	V* search(K key, size_t level);
+	dV* search(dK key, size_t level);
 };
 
 class LevelInfo{
@@ -48,7 +48,7 @@ public:
 	bool getFilePath(string filename, std::string& path);
 	bool isSorted();
 	std::vector<SSTable*> pickFiles();
-	V* get(uint64_t key);	
+	dV* get(uint64_t key);	
 };
 
 class DiskInfo{
@@ -60,8 +60,8 @@ class DiskInfo{
 protected:	
 	bool ReachEnd(vector<vector<Pair>::iterator> indexList, vector<vector<Pair>::iterator> indexEndList);
 	size_t getIterWithMinKey(vector<vector<Pair>::iterator> indexList, vector<vector<Pair>::iterator> indexEndList);
-	K findMinKey(vector<SSTable*> fileList);
-	K findMaxKey(vector<SSTable*> fileList);
+	dK findMinKey(vector<SSTable*> fileList);
+	dK findMaxKey(vector<SSTable*> fileList);
 	vector<SSTable*> SelectNextLevel(size_t level, vector<SSTable*> filesToMove);
 	vector<SSTable*> filterFiles(vector<SSTable*> filesSelected, vector<SSTable*>& filesToMove);
 	bool newLevel(size_t level);
@@ -75,7 +75,7 @@ public:
 	void Compaction(size_t levelNow);
 	ofstream* createOutFile(size_t Level, string& filename);
 	void finishOutFile(size_t level, ofstream* outfile, SSTable* cacheFile);
-	V* get(uint64_t key);
+	dV* get(uint64_t key);
 	void load();
 	SSTable* loadFile(fs::path filePath, size_t level);
 };
