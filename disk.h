@@ -4,6 +4,7 @@
 #include <vector>
 #include <iostream>
 #include <fstream>
+#include <stdlib.h>
 #include <filesystem>
 #include <algorithm> 
 #include <cmath> 
@@ -56,8 +57,11 @@ class DiskInfo{
 	struct TimeStamp {
 		uint64_t  timestamp = 0;
 		std::string getTimeStamp() { timestamp += 1; return to_string(timestamp); }
-	}timeStamp;
-protected:	
+		void updateTimeStamp(uint64_t need) {
+			timestamp =( need > timestamp) ? need : timestamp;
+		}
+	}timeStamp;	
+protected:		
 	bool ReachEnd(vector<vector<Pair>::iterator> indexList, vector<vector<Pair>::iterator> indexEndList);
 	size_t getIterWithMinKey(vector<vector<Pair>::iterator> indexList, vector<vector<Pair>::iterator> indexEndList);
 	dK findMinKey(vector<SSTable*> fileList);
@@ -70,8 +74,9 @@ protected:
 	void moveFiles(std::vector<SSTable*> filelists, size_t curl, size_t tarl);
 	void AddLevel(size_t level, vector<SSTable*> filesToMove);
 public:
+	chrono::system_clock::time_point total_start;
 	DiskInfo(){}
-	~DiskInfo(){fs::remove_all("./dir");}
+	~DiskInfo(){}
 	void Compaction(size_t levelNow);
 	ofstream* createOutFile(size_t Level, string& filename);
 	void finishOutFile(size_t level, ofstream* outfile, SSTable* cacheFile);

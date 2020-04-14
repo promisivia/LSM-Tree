@@ -5,7 +5,7 @@ void LevelInfo::removeFile( string filename) {
 	while (iter != fileList.end()) {
 		if ((*iter)->filename == filename) {
 			iter = fileList.erase(iter);
-			string path = "./dir/level" +  to_string(level) + "/" + filename + ".txt";
+			string path = "./data/level" +  to_string(level) + "/" + filename + ".txt";
 			remove((char*)path.data());
 		}
 		else iter++;
@@ -16,7 +16,7 @@ bool LevelInfo::getFilePath(string filename, string& path) {
 	auto iter = fileList.begin();
 	while (iter != fileList.end()) {
 		if ((*iter)->filename == filename) {
-			path = "./dir/level" + to_string(level) + "/" + filename + ".txt";
+			path = "./data/level" + to_string(level) + "/" + filename + ".txt";
 			return true;
 		}
 		iter++;
@@ -27,7 +27,7 @@ bool LevelInfo::getFilePath(string filename, string& path) {
 vector<SSTable*> LevelInfo::pickFiles() {
 	vector<SSTable*> pickedFiles;
 	sort(fileList.begin(), fileList.end(), [](const SSTable* a, const SSTable* b) {
-		return stoi(a->filename) < stoi(b->filename);
+		return stoll(a->filename) < stoll(b->filename);
 	});
 	for (size_t i = capacity; i < fileList.size(); i++) {
 		pickedFiles.push_back(fileList[i]);
@@ -53,8 +53,8 @@ bool DiskInfo::newLevel(size_t level) {
 		LevelList.push_back(new LevelInfo(level, fileList));
 		create = true;
 	}	
-	if (!fs::exists("./dir/level" + to_string(level))) {
-		fs::create_directory("./dir/level" + to_string(level));
+	if (!fs::exists("./data/level" + to_string(level))) {
+		fs::create_directory("./data/level" + to_string(level));
 	}
 	return create;
 }
@@ -110,8 +110,8 @@ void DiskInfo::moveFiles(vector<SSTable*> filelist, size_t curl, size_t tarl) {
 	{
 		name = filelist[i]->filename;
 		// disk
-		oldP = "./dir/level" + to_string(curl) + "/" + name + ".txt";
-		newP = "./dir/level" + to_string(tarl) + "/" + name + ".txt";
+		oldP = "./data/level" + to_string(curl) + "/" + name + ".txt";
+		newP = "./data/level" + to_string(tarl) + "/" + name + ".txt";
 		fs::rename(oldP, newP);
 		// memory
 		LevelList[tarl]->addFile(filelist[i]);
@@ -131,12 +131,12 @@ void DiskInfo::AddLevel(size_t level, vector<SSTable*> filesToMove)
 	for (size_t l = LevelList.size()-1; l > level; l--) {
 		LevelList[l]->level += 1;
 		LevelList[l]->capacity *= 2;
-		fs::rename("./dir/level" + to_string(l), "./dir/level" + to_string(l+1));
+		fs::rename("./data/level" + to_string(l), "./data/level" + to_string(l+1));
 	}
 	//add
 	vector<SSTable*> fileList;
 	LevelList.insert(LevelList.begin()+ tar_l, new LevelInfo(tar_l, fileList));
-	fs::create_directory("./dir/level" + to_string(tar_l));
+	fs::create_directory("./data/level" + to_string(tar_l));
 	//move
 	moveFiles(filesToMove, level, tar_l);
 }
@@ -163,7 +163,7 @@ void DiskInfo::Compaction(size_t levelNow) {
 		//其他情况都需要merge
 		filesToMerge.insert(filesToMerge.end(), filesToMove.begin(), filesToMove.end());
 		sort(filesToMerge.begin(), filesToMerge.end(),[](const SSTable* a, const SSTable* b) {
-			return stoi(a->filename) > stoi(b->filename);
+			return stoll(a->filename) > stoll(b->filename);
 		});
 		mergeFiles(filesToMerge, 0);
 		Compaction(1);
@@ -184,7 +184,7 @@ void DiskInfo::Compaction(size_t levelNow) {
 				else {
 					filesToMerge.insert(filesToMerge.end(), filesToMove.begin(), filesToMove.end());				
 					sort(filesToMerge.begin(), filesToMerge.end(),[](const SSTable* a, const SSTable* b) {
-						return stoi(a->filename) > stoi(b->filename);
+						return stoll(a->filename) > stoll(b->filename);
 					});
 					mergeFiles(filesToMerge, levelNow);	
 				}							
@@ -216,7 +216,7 @@ void DiskInfo::mergeFiles(vector<SSTable*> filesToMerge, size_t curLevel)
 		if(LevelList[curLevel]->getFilePath(filesToMerge[i]->filename,path))
 			infile = new ifstream(path, ios::binary);
 		else 
-			infile = new ifstream("./dir/level" + to_string(curLevel+1) + "/" + filesToMerge[i]->filename + ".txt", ios::binary);
+			infile = new ifstream("./data/level" + to_string(curLevel+1) + "/" + filesToMerge[i]->filename + ".txt", ios::binary);
 		inFileList.push_back(infile);
 	}
 	
@@ -240,7 +240,7 @@ void DiskInfo::mergeFiles(vector<SSTable*> filesToMerge, size_t curLevel)
 		inFileList[index]->seekg(iterList[index]->offset); 
 		if (inFileList[index]->peek() == TOMBSTONE)value = "";
 		else {
-			int length;
+			uint64_t length;
 			if (iterList[index] + 1 != iterEndList[index]) {
 				auto temp = iterList[index] + 1;
 				length = temp->offset - iterList[index]->offset - 2 - to_string(temp->key).length();
@@ -330,7 +330,7 @@ size_t DiskInfo::getIterWithMinKey(vector<vector<Pair>::iterator> iterList, vect
 
 ofstream* DiskInfo::createOutFile(size_t Level, string& filename){
 	filename = timeStamp.getTimeStamp();
-	string path = "./dir/level" + to_string(Level);
+	string path = "./data/level" + to_string(Level);
 	if (!fs::exists(path)) {
 		fs::create_directories(path);
 	}
@@ -387,12 +387,12 @@ dV* SSTable::search(dK key, size_t level) {
 	if (iter == cache.end())return nullptr;
 	
 	auto offset = iter->offset;
-	ifstream infile("./dir/level" + to_string(level) + "/" + filename + ".txt", ios::binary);
+	ifstream infile("./data/level" + to_string(level) + "/" + filename + ".txt", ios::binary);
 	infile.seekg(offset);
 	dV v;
 	if (infile.peek() == TOMBSTONE)  v = "";
 	else {
-		int length;
+		uint64_t length;
 		if (iter + 1 != cache.end()) {
 			auto temp = iter + 1;
 			length = temp->offset - iter->offset - 2 - to_string(temp->key).length();
@@ -414,14 +414,15 @@ dV* SSTable::search(dK key, size_t level) {
 void DiskInfo::load() {
 	size_t level = 0;
 	while (1) {
-		fs::path dir_path = "./dir/level" + to_string(level);
+		fs::path dir_path = "./data/level" + to_string(level);
 		if (!fs::exists(dir_path)) return;
 		// file list for this level
 		vector<SSTable*> fileList;
 		// for every file, load information
 		for (const auto& file : recursive_directory_iterator(dir_path)) {			
 			SSTable* sst = loadFile(file.path(),level);
-			fileList.push_back(sst);			
+			fileList.push_back(sst);	
+			timeStamp.updateTimeStamp(stoll(sst->filename) + 1);
 		}
 		LevelList.push_back(new LevelInfo(level, fileList)); 
 		level++;
