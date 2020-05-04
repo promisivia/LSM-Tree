@@ -10,7 +10,7 @@ LSM树（Log-Structured-Merge-Tree）的结构是横跨内存和磁盘的，包�
 
 Memtable可以使用跳跃表或者搜索树等数据结构来组织数据以保持数据的有序性，在本项目中使用了SkipList来储存，生长概率设为了常见的0.5。
 
-![image-20200407212025893](C:\Users\olivia\AppData\Roaming\Typora\typora-user-images\image-20200407212025893.png)
+![image-20200407212025893](https://gitee.com/fangnuowu/img/raw/master///20200504123745.png)
 
 PUT、GET等操作都首先在MemTable中操作，当MemTable达到一定的数据量后（在本项目中设定为2M，使用了一个变量来记录当前大小），MemTable会转化成为一个SSTable，储存相应文件到磁盘。
 
@@ -18,7 +18,7 @@ PUT、GET等操作都首先在MemTable中操作，当MemTable达到一定的数�
 
 SSTable(Sorted String Table)为有序键值对集合，是LSM树存入磁盘中的文件的结构。
 
-![image-20200407213401905](C:\Users\olivia\AppData\Roaming\Typora\typora-user-images\image-20200407213401905.png)
+![image-20200407213401905](https://gitee.com/fangnuowu/img/raw/master///20200504123746.png)
 
 SSTable文件的基本结构如上图所示，包括数据区、索引区，这里添加了一个divide变量方便从磁盘的SSTable文件加载索引区。
 
@@ -28,7 +28,7 @@ SSTable文件的基本结构如上图所示，包括数据区、索引区，这�
 
 ###     1.3. Disk
 
-![disk](C:\Users\olivia\AppData\Roaming\Typora\typora-user-images\image-20200407214445001.png)
+![disk](https://gitee.com/fangnuowu/img/raw/master///20200504123747.png)
 
 ​    SSTable文件在磁盘中分层存储，每层最大文件数由预设的比例决定。同时随着层数的增加，规定一个文件个数的上限。本项目中使用的参数：比例为2，第零层最大个数为2，文件数最多不超过128。
 
@@ -72,13 +72,13 @@ Compaction是最耗时的操作，为了提升性能，简单做了如下的优�
 
    测试数据: 1-1024，random string
 
-   ![image-20200408090831528](C:\Users\olivia\AppData\Roaming\Typora\typora-user-images\image-20200408090831528.png)
+   ![image-20200408090831528](https://gitee.com/fangnuowu/img/raw/master///20200504123748.png)
 
 2. 涉及到文件操作但没有compaction
 
    测试数据: 1-1024*5，random string
 
-   ![image-20200407232548621](C:\Users\olivia\AppData\Roaming\Typora\typora-user-images\image-20200407232548621.png)
+   ![image-20200407232548621](https://gitee.com/fangnuowu/img/raw/master///20200504123749.png)
    
    当没有涉及到磁盘操作时，所需要的平均时间很少，push>delete>get,  当涉及到磁盘操作时，所需要的平均时间很少，push远小于delete和get, 可见LSM确实支持更高效的数据更新和写入。
 
@@ -88,9 +88,9 @@ Compaction是最耗时的操作，为了提升性能，简单做了如下的优�
 
 测试方法: 每PUT 100次统计所用的时间，计算每秒的平均操作数，带来一定误差。
 
-![image-20200407234845028](C:\Users\olivia\AppData\Roaming\Typora\typora-user-images\image-20200407234845028.png)
+![image-20200407234845028](https://gitee.com/fangnuowu/img/raw/master///20200504123750.png)
 
-![image-20200414133136494](C:\Users\olivia\AppData\Roaming\Typora\typora-user-images\image-20200414133136494.png)
+![image-20200414133136494](https://gitee.com/fangnuowu/img/raw/master///20200504123751.png)
 
 整体吞吐量较为稳定，开始最大。
 
